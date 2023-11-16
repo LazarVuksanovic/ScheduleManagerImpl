@@ -53,7 +53,8 @@ public class ScheduleImpl extends Schedule {
 
     @Override
     public void makeSchedule() {
-
+        this.headers = new ArrayList<>();
+        this.order = new ArrayList<>();
     }
 
     @Override
@@ -129,17 +130,29 @@ public class ScheduleImpl extends Schedule {
 
     @Override
     public void makeSchedule(Schedule schedule) {
-
+        this.setTerms(schedule.getTerms());
+        this.setPlaces(schedule.getPlaces());
     }
 
     @Override
     public void addTerm(Term term) {
-
+        this.getTerms().add(term);
+        boolean exists = false;
+        for(Place p : this.getPlaces()){
+            if (p.getName().equals(term.getPlace().getName())){
+                exists = true;
+            }
+        }
+        if(!exists)
+            this.getPlaces().add(term.getPlace());
     }
 
     @Override
     public void addTerm(LocalDate localDate, LocalTime localTime, LocalTime localTime1, Place place) {
-
+        this.getTerms().add(new TermImpl(localDate, localTime, localTime1, place, new HashMap<>()));
+    }
+    public void addTerm(LocalDate localDate, LocalTime localTime, LocalTime localTime1, Place place, Map<String, String> info) {
+        this.getTerms().add(new TermImpl(localDate, localTime, localTime1, place, info));
     }
 
     @Override
@@ -149,17 +162,38 @@ public class ScheduleImpl extends Schedule {
 
     @Override
     public void deleteTerm(Term term) {
-
+        for(int i = 0; i < this.getTerms().size(); i++){
+            Term t = this.getTerms().get(i);
+            if(t.getPlace().equals(term.getPlace()) && t.getDate().equals(term.getDate())
+                && t.getTimeStart().equals(term.getTimeStart()) && t.getTimeEnd().equals(term.getTimeEnd())){
+                this.getTerms().remove(i);
+                return;
+            }
+        }
     }
 
     @Override
     public void deleteTermInDateSpan(LocalDate localDate, LocalDate localDate1) {
-
+        List<Integer> toDelete = new ArrayList<>();
+        for(int i = 0; i < this.getTerms().size(); i++){
+            Term t = this.getTerms().get(i);
+            if(t.getDate().isAfter(localDate) && t.getDate().isBefore(localDate1))
+                toDelete.add(i);
+        }
+        for(Integer i : toDelete)
+            this.getTerms().remove(i);
     }
 
     @Override
     public void deleteTermInDateAndTimeSpan(LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
-
+        List<Integer> toDelete = new ArrayList<>();
+        for(int i = 0; i < this.getTerms().size(); i++){
+            Term t = this.getTerms().get(i);
+            if(t.getDate().isAfter(localDate) && t.getDate().isBefore(localDate1) && t.getTimeStart().isAfter(localTime))
+                toDelete.add(i);
+        }
+        for(Integer i : toDelete)
+            this.getTerms().remove(i);
     }
 
     @Override
@@ -169,7 +203,14 @@ public class ScheduleImpl extends Schedule {
 
     @Override
     public void deleteTerm(LocalDate localDate, LocalTime localTime, LocalTime localTime1) {
-
+        List<Integer> toDelete = new ArrayList<>();
+        for(int i = 0; i < this.getTerms().size(); i++){
+            Term t = this.getTerms().get(i);
+            if(t.getDate().equals(localDate) && t.getTimeStart().equals(localTime) && t.getTimeEnd().equals(localTime1))
+                toDelete.add(i);
+        }
+        for(Integer i : toDelete)
+            this.getTerms().remove(i);
     }
 
     @Override
