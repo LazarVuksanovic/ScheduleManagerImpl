@@ -2,8 +2,12 @@ package rs.raf.schedulemanagerimpl;
 
 import rs.raf.Place;
 
-public class Main {
-    public static void main(String[] args) {
+import java.io.File;
+import java.io.IOException;
 
+public class Main {
+    public static void main(String[] args) throws IOException {
+        File csv = new File("D:\\Projekti\\ScheduleManagerImpl\\src\\main\\resources\\csv.csv");
+        ScheduleImpl schedule = new ScheduleImpl(csv);
     }
 }

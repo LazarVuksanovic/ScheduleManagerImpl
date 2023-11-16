@@ -1,28 +1,42 @@
 package rs.raf.schedulemanagerimpl;
 
+import com.opencsv.CSVReader;
+import com.opencsv.CSVReaderBuilder;
 import rs.raf.Place;
 import rs.raf.Schedule;
 import rs.raf.Term;
 
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
 public class ScheduleImpl extends Schedule {
-
+    List<String> headers;
     public ScheduleImpl(){
         super();
+        headers = new ArrayList<>();
     }
 
     public ScheduleImpl(List<Term> terms){
         super(terms);
+        List<String> headers;
+    }
+
+    public ScheduleImpl(File file) throws IOException {
+        super();
+        List<String> headers;
+        this.makeSchedule(file);
     }
 
     public ScheduleImpl(List<Term> terms, List<Place> places){
         super(terms, places);
+        List<String> headers;
     }
 
     @Override
@@ -37,6 +51,9 @@ public class ScheduleImpl extends Schedule {
 
     @Override
     public void makeSchedule(File file) throws IOException {
+        FileReader fr = new FileReader(file);
+        CSVReader reader = new CSVReaderBuilder(fr).build();
+        headers = Arrays.stream(reader.readNext()).toList();
 
     }
 
