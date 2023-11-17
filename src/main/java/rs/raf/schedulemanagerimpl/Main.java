@@ -8,9 +8,12 @@ import java.io.IOException;
 public class Main {
     public static void main(String[] args) throws IOException {
         File csv = new File("D:\\Projekti\\ScheduleManagerImpl\\src\\main\\resources\\csv.csv");
-        ScheduleImpl schedule = new ScheduleImpl(csv);
-        System.out.println(schedule.getTerms());
+        //ScheduleImpl schedule = new ScheduleImpl(csv);
+        //System.out.println(schedule.getTerms());
         System.out.println("===================");
-        System.out.println(schedule.getPlaces());
+        ScheduleImpl s = new ScheduleImpl();
+        File places = new File("D:\\Projekti\\ScheduleManagerImpl\\src\\main\\resources\\places.csv");
+        s.loadPlaces(places);
+        System.out.println(s.getPlaces());
     }
 }

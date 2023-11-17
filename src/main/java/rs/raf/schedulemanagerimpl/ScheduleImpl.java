@@ -48,7 +48,26 @@ public class ScheduleImpl extends Schedule {
 
     @Override
     public void loadPlaces(File file) throws IOException {
+        FileReader fr = new FileReader(file);
+        CSVParser parser = new CSVParserBuilder().withSeparator(',').withIgnoreQuotations(true).build();
+        CSVReader reader = new CSVReaderBuilder(fr).withCSVParser(parser).build();
 
+        String[] line;
+        while ((line = reader.readNext()) != null) {
+            System.out.println(line[0]);
+            PlaceImpl newPlace = new PlaceImpl(line[0], line[1]);
+            if(line.length > 2){
+                String[] inputProp = line[2].split(";");
+                Map<String, Integer> properties = new HashMap<>();
+                for (String property : inputProp) {
+                    properties.put(property.substring(0, property.indexOf(":")),
+                            Integer.parseInt(property.substring(property.indexOf(":")+1)));
+                }
+                newPlace.setProperties(properties);
+            }
+
+            this.getPlaces().add(newPlace);
+        }
     }
 
     @Override
