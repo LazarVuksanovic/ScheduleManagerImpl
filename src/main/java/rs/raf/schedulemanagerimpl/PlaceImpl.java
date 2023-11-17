@@ -11,8 +11,7 @@ public class PlaceImpl extends Place {
     }
 
     public PlaceImpl(String name){
-        super();
-        super.setName(name);
+        super(name);
     }
 
     public PlaceImpl(String name, String location){
@@ -33,4 +32,6 @@ public class PlaceImpl extends Place {
                 "properties=" + super.getProperties() +
                 "}\n";
     }
+
+
 }

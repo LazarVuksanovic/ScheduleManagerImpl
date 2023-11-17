@@ -19,31 +19,67 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.util.*;
 
-public class ScheduleImpl extends Schedule {
-    private List<String> order;
+public class ScheduleImpl implements Schedule {
+    private Set<TermImpl> terms;
+    private List<Place> places;
+    private List<String> headersOrder;
     private List<String> headers;
+
     public ScheduleImpl(){
-        super();
+        this.terms = new TreeSet<>();
         this.headers = new ArrayList<>();
-        this.order = new ArrayList<>();
+        this.headersOrder = new ArrayList<>();
     }
 
-    public ScheduleImpl(List<Term> terms){
-        super(terms);
+    public ScheduleImpl(Set<TermImpl> terms){
+        this.terms = terms;
         this.headers = new ArrayList<>();
+        this.headersOrder = new ArrayList<>();
     }
 
     public ScheduleImpl(File file) throws IOException {
-        super();
         this.headers = new ArrayList<>();
-        this.order = new ArrayList<>();
+        this.headersOrder = new ArrayList<>();
         this.makeSchedule(file);
     }
 
-    public ScheduleImpl(List<Term> terms, List<Place> places){
-        super(terms, places);
+    public ScheduleImpl(Set<TermImpl> terms, List<Place> places){
+        this.terms = terms;
+        this.places = places;
         this.headers = new ArrayList<>();
-        this.order = new ArrayList<>();
+        this.headersOrder = new ArrayList<>();
+    }
+
+    public List<String> getheadersOrder() {
+        return headersOrder;
+    }
+
+    public void setheadersOrder(List<String> headersOrder) {
+        this.headersOrder = headersOrder;
+    }
+
+    public List<String> getHeaders() {
+        return headers;
+    }
+
+    public void setHeaders(List<String> headers) {
+        this.headers = headers;
+    }
+
+    public Set<TermImpl> getTerms() {
+        return terms;
+    }
+
+    public void setTerms(Set<TermImpl> terms) {
+        this.terms = terms;
+    }
+
+    public List<Place> getPlaces() {
+        return places;
+    }
+
+    public void setPlaces(List<Place> places) {
+        this.places = places;
     }
 
     @Override
@@ -54,10 +90,9 @@ public class ScheduleImpl extends Schedule {
 
         String[] line;
         while ((line = reader.readNext()) != null) {
-            System.out.println(line[0]);
             PlaceImpl newPlace = new PlaceImpl(line[0], line[1]);
             if(line.length > 2){
-                String[] inputProp = line[2].split(";");
+                String[] inputProp = line[2].replace(" ", "").split(";");
                 Map<String, Integer> properties = new HashMap<>();
                 for (String property : inputProp) {
                     properties.put(property.substring(0, property.indexOf(":")),
@@ -66,14 +101,14 @@ public class ScheduleImpl extends Schedule {
                 newPlace.setProperties(properties);
             }
 
-            this.getPlaces().add(newPlace);
+            this.places.add(newPlace);
         }
     }
 
     @Override
     public void makeSchedule() {
         this.headers = new ArrayList<>();
-        this.order = new ArrayList<>();
+        this.headersOrder = new ArrayList<>();
     }
 
     @Override
@@ -83,13 +118,13 @@ public class ScheduleImpl extends Schedule {
         CSVReader reader = new CSVReaderBuilder(fr).withCSVParser(parser).build();
 
         for(String e : reader.readNext())
-           order.add(e.replace("\"", ""));
+           headersOrder.add(e.replace("\"", ""));
         for(String e : reader.readNext())
             headers.add(e.replace("\"", ""));
-        System.out.println(order);
+        System.out.println(headersOrder);
         String[] line;
         while ((line = reader.readNext()) != null) {
-            int orderIndex = 0;
+            int headersOrderIndex = 0;
             Map<String, String> terminfo = new HashMap<>();
             LocalDate date = LocalDate.now();
             LocalTime timeStart = LocalTime.now();
@@ -99,8 +134,8 @@ public class ScheduleImpl extends Schedule {
             for (String cell : line) {
                 cell = cell.replace("\"", "");
                 //System.out.println("cell " + cell);
-                switch (order.get(orderIndex)) {
-                    case "terminfo" -> terminfo.put(headers.get(orderIndex), cell);
+                switch (headersOrder.get(headersOrderIndex)) {
+                    case "terminfo" -> terminfo.put(headers.get(headersOrderIndex), cell);
                     case "date" -> date = LocalDate.of(2023, 11, 9);
                     case "time" -> {
                         String start = cell.substring(0, cell.indexOf('-'));
@@ -120,7 +155,7 @@ public class ScheduleImpl extends Schedule {
                     }
                     case "place" -> {
                         boolean exists = false;
-                        for (Place p : super.getPlaces()) {
+                        for (Place p : this.places) {
                             if (p.getName().equals(cell)) {
                                 place = p;
                                 exists = true;
@@ -129,15 +164,15 @@ public class ScheduleImpl extends Schedule {
                         }
                         if(!exists){
                             place = new PlaceImpl(cell);
-                            this.getPlaces().add(place);
+                            this.places.add(place);
                         }
                     }
                 }
-                orderIndex++;
+                headersOrderIndex++;
             }
             TermImpl newTerm = new TermImpl(date, timeStart, timeEnd, place, terminfo);
             place.getTerms().add(newTerm);
-            this.getTerms().add(newTerm);
+            this.terms.add(newTerm);
 
         }
     }
@@ -149,43 +184,43 @@ public class ScheduleImpl extends Schedule {
 
     @Override
     public void makeSchedule(Schedule schedule) {
-        this.setTerms(schedule.getTerms());
-        this.setPlaces(schedule.getPlaces());
+        //TODO beskorisno
     }
 
     @Override
     public void addTerm(Term term) {
-        this.getTerms().add(term);
+        this.terms.add((TermImpl)term);
         boolean exists = false;
-        for(Place p : this.getPlaces()){
+        for(Place p : this.places){
             if (p.getName().equals(term.getPlace().getName())){
                 exists = true;
             }
         }
         if(!exists)
-            this.getPlaces().add(term.getPlace());
+            this.places.add(term.getPlace());
     }
 
     @Override
     public void addTerm(LocalDate localDate, LocalTime localTime, LocalTime localTime1, Place place) {
-        this.getTerms().add(new TermImpl(localDate, localTime, localTime1, place, new HashMap<>()));
+        this.terms.add(new TermImpl(localDate, localTime, localTime1, place, new HashMap<>()));
     }
     public void addTerm(LocalDate localDate, LocalTime localTime, LocalTime localTime1, Place place, Map<String, String> info) {
-        this.getTerms().add(new TermImpl(localDate, localTime, localTime1, place, info));
+        this.terms.add(new TermImpl(localDate, localTime, localTime1, place, info));
     }
 
     @Override
     public void addTerm(LocalDate localDate, LocalTime localTime) {
-
+        //TODO beskorisno
     }
 
     @Override
     public void deleteTerm(Term term) {
-        for(int i = 0; i < this.getTerms().size(); i++){
-            Term t = this.getTerms().get(i);
-            if(t.getPlace().equals(term.getPlace()) && t.getDate().equals(term.getDate())
-                && t.getTimeStart().equals(term.getTimeStart()) && t.getTimeEnd().equals(term.getTimeEnd())){
-                this.getTerms().remove(i);
+        Iterator<TermImpl> iterator = this.terms.iterator();
+        while (iterator.hasNext()) {
+            TermImpl t = iterator.next();
+            if (t.getPlace().equals(term.getPlace()) && t.getDate().equals(term.getDate())
+                    && t.getTimeStart().equals(term.getTimeStart()) && t.getTimeEnd().equals(term.getTimeEnd())) {
+                iterator.remove();
                 return;
             }
         }
@@ -193,43 +228,24 @@ public class ScheduleImpl extends Schedule {
 
     @Override
     public void deleteTermInDateSpan(LocalDate localDate, LocalDate localDate1) {
-        List<Integer> toDelete = new ArrayList<>();
-        for(int i = 0; i < this.getTerms().size(); i++){
-            Term t = this.getTerms().get(i);
-            if(t.getDate().isAfter(localDate) && t.getDate().isBefore(localDate1))
-                toDelete.add(i);
-        }
-        for(Integer i : toDelete)
-            this.getTerms().remove(i);
+        this.terms.removeIf(t -> t.getDate().isAfter(localDate) && t.getDate().isBefore(localDate1));
     }
 
     @Override
     public void deleteTermInDateAndTimeSpan(LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
-        List<Integer> toDelete = new ArrayList<>();
-        for(int i = 0; i < this.getTerms().size(); i++){
-            Term t = this.getTerms().get(i);
-            if(t.getDate().isAfter(localDate) && t.getDate().isBefore(localDate1) && t.getTimeStart().isAfter(localTime))
-                toDelete.add(i);
-        }
-        for(Integer i : toDelete)
-            this.getTerms().remove(i);
+        this.terms.removeIf(t -> t.getDate().isAfter(localDate) && t.getDate().isBefore(localDate1)
+                                && t.getTimeStart().isAfter(localTime) && t.getTimeStart().isBefore(localTime1));
     }
 
     @Override
     public void deleteTerm(LocalDate localDate, LocalTime localTime) {
-
+        //TODO beskorisno
     }
 
     @Override
     public void deleteTerm(LocalDate localDate, LocalTime localTime, LocalTime localTime1) {
-        List<Integer> toDelete = new ArrayList<>();
-        for(int i = 0; i < this.getTerms().size(); i++){
-            Term t = this.getTerms().get(i);
-            if(t.getDate().equals(localDate) && t.getTimeStart().equals(localTime) && t.getTimeEnd().equals(localTime1))
-                toDelete.add(i);
-        }
-        for(Integer i : toDelete)
-            this.getTerms().remove(i);
+        this.terms.removeIf(t -> t.getDate().equals(localDate) && t.getTimeStart().equals(localTime)
+                                                                && t.getTimeEnd().equals(localTime1));
     }
 
     @Override
@@ -239,7 +255,7 @@ public class ScheduleImpl extends Schedule {
 
     @Override
     public void deleteTerm(Place place, LocalDate localDate, LocalTime localTime, LocalTime localTime1) {
-
+        this.deleteTerm(new TermImpl(localDate, localTime, localTime1, place, null));
     }
 
     @Override
@@ -258,32 +274,72 @@ public class ScheduleImpl extends Schedule {
     }
 
     @Override
-    public void searchTerm(Place place) {
-
+    public List<Term> searchTerm(Place place) {
+        return null;
     }
 
     @Override
-    public void searchTerm(Place place, LocalDate localDate, LocalDate localDate1) {
-
+    public List<Term> searchTerm(Place place, LocalDate localDate, LocalDate localDate1) {
+        return null;
     }
 
     @Override
-    public void searchTerm(Place place, Map<String, Integer> map) {
-
+    public List<Term> searchTerm(Place place, Map<String, Integer> map) {
+        return null;
     }
 
     @Override
-    public void searchTerm(Place place, LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
-
+    public List<Term> searchTerm(Place place, LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
+        return null;
     }
 
     @Override
-    public void searchTerm(Map<String, Integer> map) {
-
+    public List<Term> searchTerm(Map<String, Integer> map) {
+        return null;
     }
 
     @Override
-    public void searchTerm(LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
+    public List<Term> searchTerm(LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
+        return null;
+    }
 
+    @Override
+    public String searchAvailableTerms(Date date) {
+        return null;
+    }
+
+    @Override
+    public List<Place> searchAvailableTerms(Date date, LocalTime localTime, LocalTime localTime1) {
+        return null;
+    }
+
+    @Override
+    public String searchAvailableTerms(Place place) {
+        return null;
+    }
+
+    @Override
+    public String searchAvailableTerms(Place place, LocalDate localDate, LocalDate localDate1) {
+        return null;
+    }
+
+    @Override
+    public String searchAvailableTerms(Place place, Map<String, Integer> map) {
+        return null;
+    }
+
+    @Override
+    public String searchAvailableTerms(Place place, LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
+        return null;
+    }
+
+    @Override
+    public String searchAvailableTerms(Map<String, Integer> map) {
+        return null;
+    }
+
+    @Override
+    public String searchAvailableTerms(LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
+        return null;
     }
 }
