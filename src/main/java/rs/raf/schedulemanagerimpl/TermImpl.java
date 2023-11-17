@@ -18,8 +18,16 @@ public class TermImpl extends Term implements Comparable<Term> {
     public int compareTo(Term o) {
         int dateComparison = this.getDate().compareTo(o.getDate());
 
-        if (dateComparison == 0)
-            return this.getTimeStart().compareTo(o.getTimeStart());
+        if (dateComparison == 0){
+            int timeStartComparison = this.getTimeStart().compareTo(o.getTimeStart());
+            if (timeStartComparison == 0) {
+                int timeEndComparison = this.getTimeEnd().compareTo(o.getTimeEnd());
+                if(timeEndComparison == 0)
+                    return this.getPlace().getName().compareTo(o.getPlace().getName());
+            }
+            else
+                return timeStartComparison;
+        }
 
         return dateComparison;
     }

@@ -38,6 +38,8 @@ public class ScheduleImpl implements Schedule {
     }
 
     public ScheduleImpl(File file) throws IOException {
+        this.terms = new TreeSet<>();
+        this.places = new ArrayList<>();
         this.headers = new ArrayList<>();
         this.headersOrder = new ArrayList<>();
         this.makeSchedule(file);
@@ -121,7 +123,7 @@ public class ScheduleImpl implements Schedule {
            headersOrder.add(e.replace("\"", ""));
         for(String e : reader.readNext())
             headers.add(e.replace("\"", ""));
-        System.out.println(headersOrder);
+
         String[] line;
         while ((line = reader.readNext()) != null) {
             int headersOrderIndex = 0;
@@ -130,17 +132,15 @@ public class ScheduleImpl implements Schedule {
             LocalTime timeStart = LocalTime.now();
             LocalTime timeEnd = LocalTime.now();
             Place place = new PlaceImpl();
-
+            Random random = new Random();// za datume, trenutno resejne
             for (String cell : line) {
                 cell = cell.replace("\"", "");
-                //System.out.println("cell " + cell);
                 switch (headersOrder.get(headersOrderIndex)) {
                     case "terminfo" -> terminfo.put(headers.get(headersOrderIndex), cell);
-                    case "date" -> date = LocalDate.of(2023, 11, 9);
+                    case "date" -> date = LocalDate.of(2023, random.nextInt(12) + 1, random.nextInt(30) + 1);
                     case "time" -> {
                         String start = cell.substring(0, cell.indexOf('-'));
                         String end = cell.substring(cell.indexOf('-') + 1);
-                        System.out.println("start: " + start + " end: " + end);
                         if (start.length() == 2)
                             timeStart = LocalTime.of(Integer.parseInt(start), 0); // Assuming the minute part is 0 for this case
                         else
