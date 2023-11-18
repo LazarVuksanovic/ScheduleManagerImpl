@@ -14,6 +14,10 @@ public class TermImpl extends Term implements Comparable<Term> {
         this.info = info;
     }
 
+    public TermImpl(LocalDate date, LocalTime timeStart, LocalTime timeEnd, Place place) {
+        super(date, timeStart, timeEnd, place);
+    }
+
     @Override
     public int compareTo(Term o) {
         int dateComparison = this.getDate().compareTo(o.getDate());

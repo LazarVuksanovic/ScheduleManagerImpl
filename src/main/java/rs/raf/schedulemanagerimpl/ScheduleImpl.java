@@ -4,8 +4,6 @@ import com.opencsv.CSVParser;
 import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
-import javafx.util.Pair;
-import javafx.util.converter.LocalDateStringConverter;
 import rs.raf.Place;
 import rs.raf.Schedule;
 import rs.raf.Term;
@@ -13,10 +11,9 @@ import rs.raf.Term;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
 import java.util.*;
 
 public class ScheduleImpl implements Schedule {
@@ -27,6 +24,7 @@ public class ScheduleImpl implements Schedule {
 
     public ScheduleImpl(){
         this.terms = new TreeSet<>();
+        this.places = new ArrayList<>();
         this.headers = new ArrayList<>();
         this.headersOrder = new ArrayList<>();
     }
@@ -108,12 +106,6 @@ public class ScheduleImpl implements Schedule {
     }
 
     @Override
-    public void makeSchedule() {
-        this.headers = new ArrayList<>();
-        this.headersOrder = new ArrayList<>();
-    }
-
-    @Override
     public void makeSchedule(File file) throws IOException {
         FileReader fr = new FileReader(file);
         CSVParser parser = new CSVParserBuilder().withSeparator(',').withIgnoreQuotations(true).build();
@@ -137,7 +129,7 @@ public class ScheduleImpl implements Schedule {
                 cell = cell.replace("\"", "");
                 switch (headersOrder.get(headersOrderIndex)) {
                     case "terminfo" -> terminfo.put(headers.get(headersOrderIndex), cell);
-                    case "date" -> date = LocalDate.of(2023, random.nextInt(12) + 1, random.nextInt(30) + 1);
+                    case "date" -> date = LocalDate.of(2023, /*random.nextInt(12) + 1*/4, /*random.nextInt(30) + 1*/4);
                     case "time" -> {
                         String start = cell.substring(0, cell.indexOf('-'));
                         String end = cell.substring(cell.indexOf('-') + 1);
@@ -183,34 +175,24 @@ public class ScheduleImpl implements Schedule {
     }
 
     @Override
-    public void makeSchedule(Schedule schedule) {
-        //TODO beskorisno
+    public void exportSchedule(File file) throws IOException {
+
     }
 
     @Override
     public void addTerm(Term term) {
         this.terms.add((TermImpl)term);
-        boolean exists = false;
-        for(Place p : this.places){
-            if (p.getName().equals(term.getPlace().getName())){
-                exists = true;
-            }
-        }
-        if(!exists)
-            this.places.add(term.getPlace());
+        addPlaceIfNeeded(term.getPlace());
     }
 
     @Override
     public void addTerm(LocalDate localDate, LocalTime localTime, LocalTime localTime1, Place place) {
         this.terms.add(new TermImpl(localDate, localTime, localTime1, place, new HashMap<>()));
+        addPlaceIfNeeded(place);
     }
     public void addTerm(LocalDate localDate, LocalTime localTime, LocalTime localTime1, Place place, Map<String, String> info) {
         this.terms.add(new TermImpl(localDate, localTime, localTime1, place, info));
-    }
-
-    @Override
-    public void addTerm(LocalDate localDate, LocalTime localTime) {
-        //TODO beskorisno
+        addPlaceIfNeeded(place);
     }
 
     @Override
@@ -238,11 +220,6 @@ public class ScheduleImpl implements Schedule {
     }
 
     @Override
-    public void deleteTerm(LocalDate localDate, LocalTime localTime) {
-        //TODO beskorisno
-    }
-
-    @Override
     public void deleteTerm(LocalDate localDate, LocalTime localTime, LocalTime localTime1) {
         this.terms.removeIf(t -> t.getDate().equals(localDate) && t.getTimeStart().equals(localTime)
                                                                 && t.getTimeEnd().equals(localTime1));
@@ -250,7 +227,7 @@ public class ScheduleImpl implements Schedule {
 
     @Override
     public void deleteTerm(Place place) {
-
+        this.terms.removeIf(t -> place.getTerms().contains(t));
     }
 
     @Override
@@ -260,17 +237,155 @@ public class ScheduleImpl implements Schedule {
 
     @Override
     public void deleteTerm(Place place, LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
-
+        this.terms.removeIf(t -> t.getPlace().equals(place) && t.getDate().isAfter(localDate) && t.getDate().isBefore(localDate1)
+                                                && t.getTimeStart().isAfter(localTime) && t.getTimeStart().isBefore(localTime1));
     }
 
     @Override
-    public void moveTerm(Term term, LocalDate localDate, LocalTime localTime) {
-
+    public Term moveTerm(Term term, LocalDate localDate, LocalTime localTime) {
+        TermImpl newTerm = null;
+        Duration timeDifference = Duration.between(term.getTimeStart(), localTime);
+        LocalTime newTimeEnd = term.getTimeEnd().plus(timeDifference);
+        for(TermImpl t : this.terms){
+            if(t.equals(term)){
+                newTerm = t;
+                break;
+            }
+        }
+        if (newTerm != null){
+            boolean available = true;
+            for(Term t : term.getPlace().getTerms()){
+                if(t.getDate().equals(localDate)){
+                    if((!localTime.isBefore(t.getTimeStart()) && !localTime.isAfter(t.getTimeEnd())) ||
+                            (!localTime.isBefore(newTimeEnd) && !localTime.isAfter(newTimeEnd))){
+                        available = false;
+                        break;
+                    }
+                }
+            }
+            if (available){
+                this.terms.remove(newTerm);
+                newTerm.setDate(localDate);
+                newTerm.setTimeStart(localTime);
+                newTerm.setTimeEnd(newTimeEnd);
+                this.terms.add(newTerm);
+                return newTerm;
+            }
+            else
+                System.out.println("Term not available.");
+        }
+        else
+            System.out.println("Term doesn't exists.");
+        return null;
     }
 
     @Override
-    public void moveTerm(Term term, LocalDate localDate, LocalTime localTime, Place place) {
+    public Term moveTerm(Term term, LocalDate localDate, LocalTime localTime, Place place) {
+        TermImpl newTerm = null;
+        Duration timeDifference = Duration.between(term.getTimeStart(), localTime);
+        LocalTime newTimeEnd = term.getTimeEnd().plus(timeDifference);
+        for(TermImpl t : this.terms){
+            if(t.equals(term)){
+                newTerm = t;
+                break;
+            }
+        }
+        if (newTerm != null){
+            boolean available = true;
+            for(Term t : place.getTerms()){
+                if(t.getDate().equals(localDate)){
+                    if((!localTime.isBefore(t.getTimeStart()) && !localTime.isAfter(t.getTimeEnd())) ||
+                            (!localTime.isBefore(newTimeEnd) && !localTime.isAfter(newTimeEnd))){
+                        available = false;
+                        break;
+                    }
+                }
+            }
+            if(available){
+                this.terms.remove(newTerm);
+                newTerm.setDate(localDate);
+                newTerm.setTimeStart(localTime);
+                newTerm.setPlace(place);
+                this.terms.add(newTerm);
+            }
+            else
+                System.out.println("Term not available.");
+        }
+        else
+            System.out.println("Term doesn't exists.");
+        return null;
+    }
 
+    @Override
+    public Term moveTerm(Term term, LocalDate localDate, LocalTime localTime, LocalTime localTime1) {
+        TermImpl newTerm = null;
+        for(TermImpl t : this.terms){
+            if(t.equals(term)){
+                newTerm = t;
+                break;
+            }
+        }
+        if (newTerm != null){
+            boolean available = true;
+            for(Term t : term.getPlace().getTerms()){
+                if(t.getDate().equals(localDate)){
+                    if((!localTime.isBefore(t.getTimeStart()) && !localTime.isAfter(t.getTimeEnd())) ||
+                            (!localTime.isBefore(localTime1) && !localTime.isAfter(localTime1))){
+                        available = false;
+                        break;
+                    }
+                }
+            }
+            if (available){
+                this.terms.remove(newTerm);
+                newTerm.setDate(localDate);
+                newTerm.setTimeStart(localTime);
+                newTerm.setTimeEnd(localTime1);
+                this.terms.add(newTerm);
+                return newTerm;
+            }
+            else
+                System.out.println("Term not available.");
+        }
+        else
+            System.out.println("Term doesn't exists.");
+        return null;
+    }
+
+    @Override
+    public Term moveTerm(Term term, LocalDate localDate, LocalTime localTime, LocalTime localTime1, Place place) {
+        TermImpl newTerm = null;
+        for(TermImpl t : this.terms){
+            if(t.equals(term)){
+                newTerm = t;
+                break;
+            }
+        }
+        if (newTerm != null){
+            boolean available = true;
+            for(Term t : place.getTerms()){
+                if(t.getDate().equals(localDate)){
+                    if((!localTime.isBefore(t.getTimeStart()) && !localTime.isAfter(t.getTimeEnd())) ||
+                            (!localTime.isBefore(localTime1) && !localTime.isAfter(localTime1))){
+                        available = false;
+                        break;
+                    }
+                }
+            }
+            if(available){
+                this.terms.remove(newTerm);
+                newTerm.setDate(localDate);
+                newTerm.setTimeStart(localTime);
+                newTerm.setTimeEnd(localTime1);
+                newTerm.setPlace(place);
+                this.terms.add(newTerm);
+            }
+            else
+                System.out.println("Term not available.");
+        }
+        else
+            System.out.println("Term doesn't exists.");
+        return null;
     }
 
     @Override
@@ -341,5 +456,16 @@ public class ScheduleImpl implements Schedule {
     @Override
     public String searchAvailableTerms(LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
         return null;
+    }
+
+    private void addPlaceIfNeeded(Place place){
+        boolean exists = false;
+        for(Place p : this.places){
+            if (p.getName().equals(place.getName())){
+                exists = true;
+            }
+        }
+        if(!exists)
+            this.places.add(place);
     }
 }
