@@ -36,6 +36,14 @@ public class TermImpl extends Term implements Comparable<Term> {
         return dateComparison;
     }
 
+    public Map<String, String> getInfo() {
+        return info;
+    }
+
+    public void setInfo(Map<String, String> info) {
+        this.info = info;
+    }
+
     @Override
     public String toString() {
         return "TermImpl{" +

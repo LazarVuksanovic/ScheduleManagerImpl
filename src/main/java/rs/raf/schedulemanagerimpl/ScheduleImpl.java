@@ -15,6 +15,8 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class ScheduleImpl implements Schedule {
     private Set<TermImpl> terms;
@@ -33,6 +35,7 @@ public class ScheduleImpl implements Schedule {
         this.terms = terms;
         this.headers = new ArrayList<>();
         this.headersOrder = new ArrayList<>();
+         //TODO potencijalno beskorisno
     }
 
     public ScheduleImpl(File file) throws IOException {
@@ -48,6 +51,7 @@ public class ScheduleImpl implements Schedule {
         this.places = places;
         this.headers = new ArrayList<>();
         this.headersOrder = new ArrayList<>();
+        //TODO potencijalno beskorisno
     }
 
     public List<String> getheadersOrder() {
@@ -134,13 +138,13 @@ public class ScheduleImpl implements Schedule {
                         String start = cell.substring(0, cell.indexOf('-'));
                         String end = cell.substring(cell.indexOf('-') + 1);
                         if (start.length() == 2)
-                            timeStart = LocalTime.of(Integer.parseInt(start), 0); // Assuming the minute part is 0 for this case
+                            timeStart = LocalTime.of(Integer.parseInt(start), 0);
                         else
                             timeStart = LocalTime.of(Integer.parseInt(start.substring(0, start.indexOf(":"))),
                                     Integer.parseInt(start.substring(start.indexOf(":") + 1)));
 
                         if (end.length() == 2)
-                            timeEnd = LocalTime.of(Integer.parseInt(end), 0); // Assuming the minute part is 0 for this case
+                            timeEnd = LocalTime.of(Integer.parseInt(end), 0);
                         else
                             timeEnd = LocalTime.of(Integer.parseInt(start.substring(0, end.indexOf(":"))),
                                     Integer.parseInt(start.substring(end.indexOf(":") + 1)));
@@ -210,19 +214,19 @@ public class ScheduleImpl implements Schedule {
 
     @Override
     public void deleteTermInDateSpan(LocalDate localDate, LocalDate localDate1) {
-        this.terms.removeIf(t -> t.getDate().isAfter(localDate) && t.getDate().isBefore(localDate1));
+        this.terms.removeIf(t -> !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1));
     }
 
     @Override
     public void deleteTermInDateAndTimeSpan(LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
-        this.terms.removeIf(t -> t.getDate().isAfter(localDate) && t.getDate().isBefore(localDate1)
-                                && t.getTimeStart().isAfter(localTime) && t.getTimeStart().isBefore(localTime1));
+        this.terms.removeIf(t -> !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1)
+                                && !t.getTimeStart().isBefore(localTime) && !t.getTimeStart().isAfter(localTime1));
     }
 
     @Override
     public void deleteTerm(LocalDate localDate, LocalTime localTime, LocalTime localTime1) {
-        this.terms.removeIf(t -> t.getDate().equals(localDate) && t.getTimeStart().equals(localTime)
-                                                                && t.getTimeEnd().equals(localTime1));
+        this.terms.removeIf(t -> t.getDate().equals(localDate) && !t.getTimeStart().isBefore(localTime)
+                                                                && !t.getTimeStart().isAfter(localTime1));
     }
 
     @Override
@@ -237,8 +241,8 @@ public class ScheduleImpl implements Schedule {
 
     @Override
     public void deleteTerm(Place place, LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
-        this.terms.removeIf(t -> t.getPlace().equals(place) && t.getDate().isAfter(localDate) && t.getDate().isBefore(localDate1)
-                                                && t.getTimeStart().isAfter(localTime) && t.getTimeStart().isBefore(localTime1));
+        this.terms.removeIf(t -> t.getPlace().equals(place) && !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1)
+                                                && !t.getTimeStart().isBefore(localTime) && !t.getTimeStart().isAfter(localTime1));
     }
 
     @Override
@@ -390,22 +394,36 @@ public class ScheduleImpl implements Schedule {
 
     @Override
     public List<Term> searchTerm(Place place) {
-        return null;
+        return place.getTerms();
     }
 
     @Override
     public List<Term> searchTerm(Place place, LocalDate localDate, LocalDate localDate1) {
-        return null;
+        Stream<Term> filtered = place.getTerms().stream().filter(t -> !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1));
+        return filtered.collect(Collectors.toList());
     }
 
     @Override
-    public List<Term> searchTerm(Place place, Map<String, Integer> map) {
-        return null;
+    public List<Term> searchTerm(Place place, Map<String, String> map) {
+        Stream<Term> filtered = place.getTerms().stream().filter(tmp -> {
+            for (Map.Entry<String, String> property : map.entrySet()) {
+                TermImpl t = (TermImpl) tmp;
+                String key = property.getKey();
+                String value = property.getValue();
+
+                if (t.getInfo().containsKey(key) && t.getInfo().get(key).contains(value))
+                    return true;
+            }
+            return false;
+        });
+        return filtered.collect(Collectors.toList());
     }
 
     @Override
     public List<Term> searchTerm(Place place, LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
-        return null;
+        Stream<Term> filtered = place.getTerms().stream().filter(t -> !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1)
+                                                        && !t.getTimeStart().isBefore(localTime) && !t.getTimeStart().isAfter(localTime1));
+        return filtered.collect(Collectors.toList());
     }
 
     @Override
@@ -415,7 +433,9 @@ public class ScheduleImpl implements Schedule {
 
     @Override
     public List<Term> searchTerm(LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
-        return null;
+        Stream<TermImpl> filtered = this.terms.stream().filter(t -> !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1)
+                                                        && !t.getTimeStart().isBefore(localTime) && !t.getTimeStart().isAfter(localTime1));
+        return filtered.collect(Collectors.toList());
     }
 
     @Override
