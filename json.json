@@ -1,0 +1,34 @@
+[
+  {
+    "date": "2023-11-14",
+    "timeStart": "11:15:00",
+    "timeEnd": "13:00:00",
+    "place": {
+      "name": "Raf04 (u)",
+      "properties": {}
+    },
+    "info": {
+      "Dan": "�����UTO�����",
+      "Grupe": "101",
+      "Predmet": "KASNIJI TERMIN",
+      "Tip": "V",
+      "Nastavnik": "Mijatovic Igor"
+    }
+  },
+  {
+    "date": "2023-11-14",
+    "timeStart": "10:00:00",
+    "timeEnd": "11:00:00",
+    "place": {
+      "name": "Raf04 (u)",
+      "properties": {}
+    },
+    "info": {
+      "Dan": "�����UTO�����",
+      "Grupe": "101",
+      "Predmet": "RANIJI TERMIN",
+      "Tip": "V",
+      "Nastavnik": "Mijatovic Igor"
+    }
+  }
+]

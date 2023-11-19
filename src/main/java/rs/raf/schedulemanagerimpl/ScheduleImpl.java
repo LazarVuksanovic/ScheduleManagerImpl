@@ -1,5 +1,7 @@
 package rs.raf.schedulemanagerimpl;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.opencsv.CSVParser;
 import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReader;
@@ -8,13 +10,15 @@ import rs.raf.Place;
 import rs.raf.Schedule;
 import rs.raf.ScheduleImplManager;
 import rs.raf.Term;
+import rs.raf.adapters.LocalDateAdapter;
+import rs.raf.adapters.LocalTimeAdapter;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+
+import java.io.*;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -32,6 +36,8 @@ public class ScheduleImpl extends Schedule {
         FileReader fr = new FileReader(file);
         CSVParser parser = new CSVParserBuilder().withSeparator(',').withIgnoreQuotations(true).build();
         CSVReader reader = new CSVReaderBuilder(fr).withCSVParser(parser).build();
+
+        this.setPlaces(new ArrayList<>());
 
         String[] line;
         while ((line = reader.readNext()) != null) {
@@ -52,10 +58,33 @@ public class ScheduleImpl extends Schedule {
     }
 
     @Override
+    public void loadFreeDays(File file) throws IOException {
+        List<LocalDate> freeDays = new ArrayList<>();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+        FileReader fr = new FileReader(file);
+        CSVParser parser = new CSVParserBuilder().withSeparator(',').withIgnoreQuotations(true).build();
+        CSVReader reader = new CSVReaderBuilder(fr).withCSVParser(parser).build();
+
+        String[] line;
+        while ((line = reader.readNext()) != null) {
+            for(String cell : line){
+                freeDays.add(LocalDate.parse(cell, formatter));
+            }
+
+        }
+        this.setFreeDays(freeDays);
+    }
+
+    @Override
     public void makeSchedule(File file) throws IOException {
         FileReader fr = new FileReader(file);
         CSVParser parser = new CSVParserBuilder().withSeparator(',').withIgnoreQuotations(true).build();
         CSVReader reader = new CSVReaderBuilder(fr).withCSVParser(parser).build();
+
+        this.setTerms(new ArrayList<>());
+        if(this.getPlaces() == null)
+            this.setPlaces(new ArrayList<>());
 
         this.headersOrder = new ArrayList<>();
         this.headers = new ArrayList<>();
@@ -72,16 +101,16 @@ public class ScheduleImpl extends Schedule {
             LocalTime timeStart = LocalTime.now();
             LocalTime timeEnd = LocalTime.now();
             Place place = new Place();
-            Random random = new Random();// za datume, trenutno resejne
             for (String cell : line) {
                 cell = cell.replace("\"", "");
                 switch (headersOrder.get(headersOrderIndex)) {
                     case "terminfo" -> terminfo.put(headers.get(headersOrderIndex), cell);
                     case "date" -> {
-                        date = LocalDate.of(2023, /*random.nextInt(12) + 1*/4, /*random.nextInt(30) + 1*/4);
-                        if(date.isBefore(this.getScheduleStartDate()))
+                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                        date = LocalDate.parse(cell, formatter);
+                        if(this.getScheduleStartDate() == null || date.isBefore(this.getScheduleStartDate()))
                             this.setScheduleStartDate(date);
-                        else if(date.isAfter(this.getScheduleEndDate()))
+                        else if(this.getScheduleEndDate() == null || date.isAfter(this.getScheduleEndDate()))
                             this.setScheduleEndDate(date);
                     }
                     case "time" -> {
@@ -116,10 +145,7 @@ public class ScheduleImpl extends Schedule {
                 }
                 headersOrderIndex++;
             }
-            Term newTerm = new Term(date, timeStart, timeEnd, place, terminfo);
-            place.getTerms().add(newTerm);
-            this.getTerms().add(newTerm);
-
+            this.addTerm(new Term(date, timeStart, timeEnd, place, terminfo));
         }
     }
 
@@ -129,24 +155,39 @@ public class ScheduleImpl extends Schedule {
     }
 
     @Override
-    public void exportSchedule(File file) throws IOException {
+    public void exportSchedule(File file){
+        Gson gson = new GsonBuilder()
+                .registerTypeAdapter(LocalDate.class, new LocalDateAdapter())
+                .registerTypeAdapter(LocalTime.class, new LocalTimeAdapter())
+                .setPrettyPrinting()
+                .create();
 
+        try (PrintStream writer = new PrintStream(file)) {
+            gson.toJson(this.getTerms(), writer);
+            System.out.println("Successfully wrote data to Json file.");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
     public void addTerm(Term term) {
+        if(this.getFreeDays().contains(term.getDate()) && this.getTerms().contains(term))
+            return;
+
+        if(searchTerm(term.getPlace(), term.getDate(), term.getDate(), term.getTimeStart(), term.getTimeEnd()).size() != 0)
+            return;
+
         this.getTerms().add(term);
-        addPlaceIfNeeded(term.getPlace());
+        addPlaceIfNeeded(term.getPlace()).getTerms().add(term);
     }
 
     @Override
     public void addTerm(LocalDate localDate, LocalTime localTime, LocalTime localTime1, Place place) {
-        this.getTerms().add(new Term(localDate, localTime, localTime1, place, new HashMap<>()));
-        addPlaceIfNeeded(place);
+        this.addTerm(new Term(localDate, localTime, localTime1, place, new HashMap<>()));
     }
     public void addTerm(LocalDate localDate, LocalTime localTime, LocalTime localTime1, Place place, Map<String, String> info) {
-        this.getTerms().add(new Term(localDate, localTime, localTime1, place, info));
-        addPlaceIfNeeded(place);
+        this.addTerm(new Term(localDate, localTime, localTime1, place, info));
     }
 
     @Override
@@ -197,6 +238,9 @@ public class ScheduleImpl extends Schedule {
 
     @Override
     public Term moveTerm(Term term, LocalDate localDate, LocalTime localTime) {
+        if(this.getFreeDays().contains(localDate))
+            return null;
+
         Term newTerm = null;
         Duration timeDifference = Duration.between(term.getTimeStart(), localTime);
         LocalTime newTimeEnd = term.getTimeEnd().plus(timeDifference);
@@ -235,6 +279,9 @@ public class ScheduleImpl extends Schedule {
 
     @Override
     public Term moveTerm(Term term, LocalDate localDate, LocalTime localTime, Place place) {
+        if(this.getFreeDays().contains(localDate))
+            return null;
+
         Term newTerm = null;
         Duration timeDifference = Duration.between(term.getTimeStart(), localTime);
         LocalTime newTimeEnd = term.getTimeEnd().plus(timeDifference);
@@ -272,6 +319,9 @@ public class ScheduleImpl extends Schedule {
 
     @Override
     public Term moveTerm(Term term, LocalDate localDate, LocalTime localTime, LocalTime localTime1) {
+        if(this.getFreeDays().contains(localDate))
+            return null;
+
         Term newTerm = null;
         for(Term t : this.getTerms()){
             if(t.equals(term)){
@@ -308,6 +358,9 @@ public class ScheduleImpl extends Schedule {
 
     @Override
     public Term moveTerm(Term term, LocalDate localDate, LocalTime localTime, LocalTime localTime1, Place place) {
+        if(this.getFreeDays().contains(localDate))
+            return null;
+
         Term newTerm = null;
         for(Term t : this.getTerms()){
             if(t.equals(term)){
@@ -407,9 +460,11 @@ public class ScheduleImpl extends Schedule {
 
     @Override
     public List<Term> searchAvailableTerms(LocalDate date) {
+        if(this.getFreeDays().contains(date))
+            return new ArrayList<>();
+
         List<Term> availableTerms = new ArrayList<>();
         for(Place p : this.getPlaces()){
-            Arrays.sort(p.getTerms().toArray());
             Collections.sort(p.getTerms());
             LocalTime start = LocalTime.of(0,0);
             for(Term t : p.getTerms()){
@@ -428,8 +483,11 @@ public class ScheduleImpl extends Schedule {
     @Override
     public List<Term> searchAvailableTerms(LocalDate localDate, LocalDate localDate1) {
         List<Term> availableTerms = new ArrayList<>();
-        for(; !localDate.isAfter(localDate1); localDate = localDate.plusDays(1))
+        for(; !localDate.isAfter(localDate1); localDate = localDate.plusDays(1)){
+            if(this.getFreeDays().contains(localDate))
+                continue;
             availableTerms.addAll(searchAvailableTerms(localDate));
+        }
 
         Collections.sort(availableTerms);
         return availableTerms;
@@ -437,6 +495,9 @@ public class ScheduleImpl extends Schedule {
 
     @Override
     public List<Term> searchAvailableTerms(LocalDate date, LocalTime localTime, LocalTime localTime1) {
+        if(this.getFreeDays().contains(date))
+            return new ArrayList<>();
+
         List<Term> availableTerms = new ArrayList<>();
         for(Place p : this.getPlaces()){
             Arrays.sort(p.getTerms().toArray());
@@ -463,6 +524,8 @@ public class ScheduleImpl extends Schedule {
     public List<Term> searchAvailableTerms(Place place) {
         List<Term> availableTerms = new ArrayList<>();
         for(LocalDate date = this.getScheduleStartDate(); !date.isAfter(this.getScheduleEndDate()); date = date.plusDays(1)){
+            if(this.getFreeDays().contains(date))
+                continue;
             availableTerms.addAll(searchAvailableTerms(place, date));
             Collections.sort(availableTerms);
         }
@@ -475,6 +538,8 @@ public class ScheduleImpl extends Schedule {
     public List<Term> searchAvailableTerms(Place place, LocalDate localDate, LocalDate localDate1) {
         List<Term> availableTerms = new ArrayList<>();
         for(; !localDate.isAfter(localDate1); localDate = localDate.plusDays(1)){
+            if(this.getFreeDays().contains(localDate))
+                continue;
             availableTerms.addAll(searchAvailableTerms(place, localDate));
         }
 
@@ -522,6 +587,8 @@ public class ScheduleImpl extends Schedule {
     public List<Term> searchAvailableTerms(LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
         List<Term> availableTerms = new ArrayList<>();
         for(; !localDate.isAfter(localDate1); localDate = localDate.plusDays(1)){
+            if(this.getFreeDays().contains(localDate))
+                continue;
             availableTerms.addAll(searchAvailableTerms(localDate, localTime, localTime1));
         }
         Collections.sort(availableTerms);
@@ -529,6 +596,9 @@ public class ScheduleImpl extends Schedule {
     }
 
     public List<Term> searchAvailableTerms(Place place, LocalDate localDate) {
+        if(this.getFreeDays().contains(localDate))
+            return new ArrayList<>();
+
         List<Term> availableTerms = new ArrayList<>();
         Arrays.sort(place.getTerms().toArray());
         Collections.sort(place.getTerms());
@@ -546,14 +616,13 @@ public class ScheduleImpl extends Schedule {
         return availableTerms;
     }
 
-    private void addPlaceIfNeeded(Place place){
+    private Place addPlaceIfNeeded(Place place){
         boolean exists = false;
         for(Place p : this.getPlaces()){
-            if (p.getName().equals(place.getName())){
-                exists = true;
-            }
+            if (p.getName().equals(place.getName()))
+                return p;
         }
-        if(!exists)
-            this.getPlaces().add(place);
+        this.getPlaces().add(place);
+        return place;
     }
 }

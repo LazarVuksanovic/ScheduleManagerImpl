@@ -1,4 +1,4 @@
-"""terminfo"",""terminfo"",""terminfo"",""terminfo"",""date"",""time"",""place"""
-"Predmet,""Tip"",""Nastavnik"",""Grupe"",""Dan"",""Termin"",""U?ionica"""
-"KASNIJI TERMIN,""V"",""Mijatovic Igor"",""101"",""     UTO     "",""11:15-13"",""Raf04 (u)"""
-"RANIJI TERMIN,""V"",""Mijatovic Igor"",""101"",""     UTO     "",""10-11"",""Raf04 (u)"""
+"""terminfo"",""terminfo"",""terminfo"",""terminfo"",""terminfo"",""time"",""place"",""date"""
+"Predmet,""Tip"",""Nastavnik"",""Grupe"",""Dan"",""Termin"",""U?ionica"",""Datum"""
+"KASNIJI TERMIN,""V"",""Mijatovic Igor"",""101"",""ï¿½ï¿½ï¿½ï¿½ï¿½UTOï¿½ï¿½ï¿½ï¿½ï¿½"",""11:15-13"",""Raf04 (u)"",""14/11/2023"""
+"RANIJI TERMIN,""V"",""Mijatovic Igor"",""101"",""ï¿½ï¿½ï¿½ï¿½ï¿½UTOï¿½ï¿½ï¿½ï¿½ï¿½"",""10-11"",""Raf04 (u)"",""14/11/2023"""
