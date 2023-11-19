@@ -21,7 +21,6 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class ScheduleImpl extends Schedule {
 
@@ -85,6 +84,8 @@ public class ScheduleImpl extends Schedule {
         this.setTerms(new ArrayList<>());
         if(this.getPlaces() == null)
             this.setPlaces(new ArrayList<>());
+        if(this.getFreeDays() == null)
+            this.setFreeDays(new ArrayList<>());
 
         this.headersOrder = new ArrayList<>();
         this.headers = new ArrayList<>();
