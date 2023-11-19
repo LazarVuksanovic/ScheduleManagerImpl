@@ -1,6 +1,8 @@
 package rs.raf.schedulemanagerimpl;
 
 import rs.raf.Place;
+import rs.raf.Schedule;
+import rs.raf.ScheduleImplManager;
 import rs.raf.Term;
 
 import java.io.File;
@@ -11,6 +13,12 @@ import java.util.List;
 
 public class Main {
     public static void main(String[] args) throws IOException {
+        try {
+            Class.forName("rs.raf.schedulemanagerimpl.ScheduleImpl");
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        Schedule schedule = ScheduleImplManager.getScheduleSpecification();
 //        File csv = new File("D:\\Projekti\\ScheduleManagerImpl\\src\\main\\resources\\csv.csv");
 //        ScheduleImpl schedule = new ScheduleImpl(csv);
 //        System.out.println(schedule.getTerms());
@@ -24,7 +32,6 @@ public class Main {
 //        System.out.println(s.getPlaces());
 
         File oneterm = new File("D:\\Projekti\\ScheduleManagerImpl\\src\\main\\resources\\oneterm.csv");
-        ScheduleImpl schedule = new ScheduleImpl(oneterm);
         System.out.println("Pre promena:\n" + schedule.getTerms());
         List<Object> lista = List.of(schedule.getTerms().toArray());
         //new TermImpl(LocalDate.of(2022, 1,1), LocalTime.of(0, 0), LocalTime.of(0, 0), new PlaceImpl()

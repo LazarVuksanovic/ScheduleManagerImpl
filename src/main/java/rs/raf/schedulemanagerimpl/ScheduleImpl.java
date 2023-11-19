@@ -6,6 +6,7 @@ import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
 import rs.raf.Place;
 import rs.raf.Schedule;
+import rs.raf.ScheduleImplManager;
 import rs.raf.Term;
 
 import java.io.File;
@@ -18,73 +19,13 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class ScheduleImpl implements Schedule {
-    private Set<TermImpl> terms;
-    private List<Place> places;
+public class ScheduleImpl extends Schedule {
+
+    static {
+        ScheduleImplManager.setScheduleSpecification(new ScheduleImpl());
+    }
     private List<String> headersOrder;
     private List<String> headers;
-
-    public ScheduleImpl(){
-        this.terms = new TreeSet<>();
-        this.places = new ArrayList<>();
-        this.headers = new ArrayList<>();
-        this.headersOrder = new ArrayList<>();
-    }
-
-    public ScheduleImpl(Set<TermImpl> terms){
-        this.terms = terms;
-        this.headers = new ArrayList<>();
-        this.headersOrder = new ArrayList<>();
-         //TODO potencijalno beskorisno
-    }
-
-    public ScheduleImpl(File file) throws IOException {
-        this.terms = new TreeSet<>();
-        this.places = new ArrayList<>();
-        this.headers = new ArrayList<>();
-        this.headersOrder = new ArrayList<>();
-        this.makeSchedule(file);
-    }
-
-    public ScheduleImpl(Set<TermImpl> terms, List<Place> places){
-        this.terms = terms;
-        this.places = places;
-        this.headers = new ArrayList<>();
-        this.headersOrder = new ArrayList<>();
-        //TODO potencijalno beskorisno
-    }
-
-    public List<String> getheadersOrder() {
-        return headersOrder;
-    }
-
-    public void setheadersOrder(List<String> headersOrder) {
-        this.headersOrder = headersOrder;
-    }
-
-    public List<String> getHeaders() {
-        return headers;
-    }
-
-    public void setHeaders(List<String> headers) {
-        this.headers = headers;
-    }
-
-    public Set<TermImpl> getTerms() {
-        return terms;
-    }
-
-    public void setTerms(Set<TermImpl> terms) {
-        this.terms = terms;
-    }
-
-    public List<Place> getPlaces() {
-        return places;
-    }
-
-    public void setPlaces(List<Place> places) {
-        this.places = places;
-    }
 
     @Override
     public void loadPlaces(File file) throws IOException {
@@ -94,7 +35,8 @@ public class ScheduleImpl implements Schedule {
 
         String[] line;
         while ((line = reader.readNext()) != null) {
-            PlaceImpl newPlace = new PlaceImpl(line[0], line[1]);
+            Place newPlace = new Place(line[0]);
+            newPlace.setLocation(line[1]);
             if(line.length > 2){
                 String[] inputProp = line[2].replace(" ", "").split(";");
                 Map<String, Integer> properties = new HashMap<>();
@@ -105,7 +47,7 @@ public class ScheduleImpl implements Schedule {
                 newPlace.setProperties(properties);
             }
 
-            this.places.add(newPlace);
+            this.getPlaces().add(newPlace);
         }
     }
 
@@ -115,6 +57,8 @@ public class ScheduleImpl implements Schedule {
         CSVParser parser = new CSVParserBuilder().withSeparator(',').withIgnoreQuotations(true).build();
         CSVReader reader = new CSVReaderBuilder(fr).withCSVParser(parser).build();
 
+        this.headersOrder = new ArrayList<>();
+        this.headers = new ArrayList<>();
         for(String e : reader.readNext())
            headersOrder.add(e.replace("\"", ""));
         for(String e : reader.readNext())
@@ -127,13 +71,19 @@ public class ScheduleImpl implements Schedule {
             LocalDate date = LocalDate.now();
             LocalTime timeStart = LocalTime.now();
             LocalTime timeEnd = LocalTime.now();
-            Place place = new PlaceImpl();
+            Place place = new Place();
             Random random = new Random();// za datume, trenutno resejne
             for (String cell : line) {
                 cell = cell.replace("\"", "");
                 switch (headersOrder.get(headersOrderIndex)) {
                     case "terminfo" -> terminfo.put(headers.get(headersOrderIndex), cell);
-                    case "date" -> date = LocalDate.of(2023, /*random.nextInt(12) + 1*/4, /*random.nextInt(30) + 1*/4);
+                    case "date" -> {
+                        date = LocalDate.of(2023, /*random.nextInt(12) + 1*/4, /*random.nextInt(30) + 1*/4);
+                        if(date.isBefore(this.getScheduleStartDate()))
+                            this.setScheduleStartDate(date);
+                        else if(date.isAfter(this.getScheduleEndDate()))
+                            this.setScheduleEndDate(date);
+                    }
                     case "time" -> {
                         String start = cell.substring(0, cell.indexOf('-'));
                         String end = cell.substring(cell.indexOf('-') + 1);
@@ -151,7 +101,7 @@ public class ScheduleImpl implements Schedule {
                     }
                     case "place" -> {
                         boolean exists = false;
-                        for (Place p : this.places) {
+                        for (Place p : this.getPlaces()) {
                             if (p.getName().equals(cell)) {
                                 place = p;
                                 exists = true;
@@ -159,23 +109,23 @@ public class ScheduleImpl implements Schedule {
                             }
                         }
                         if(!exists){
-                            place = new PlaceImpl(cell);
-                            this.places.add(place);
+                            place = new Place(cell);
+                            this.getPlaces().add(place);
                         }
                     }
                 }
                 headersOrderIndex++;
             }
-            TermImpl newTerm = new TermImpl(date, timeStart, timeEnd, place, terminfo);
+            Term newTerm = new Term(date, timeStart, timeEnd, place, terminfo);
             place.getTerms().add(newTerm);
-            this.terms.add(newTerm);
+            this.getTerms().add(newTerm);
 
         }
     }
 
     @Override
     public void makeSchedule(List<Term> list) {
-
+        //TODO beskorisno vrv
     }
 
     @Override
@@ -185,25 +135,25 @@ public class ScheduleImpl implements Schedule {
 
     @Override
     public void addTerm(Term term) {
-        this.terms.add((TermImpl)term);
+        this.getTerms().add(term);
         addPlaceIfNeeded(term.getPlace());
     }
 
     @Override
     public void addTerm(LocalDate localDate, LocalTime localTime, LocalTime localTime1, Place place) {
-        this.terms.add(new TermImpl(localDate, localTime, localTime1, place, new HashMap<>()));
+        this.getTerms().add(new Term(localDate, localTime, localTime1, place, new HashMap<>()));
         addPlaceIfNeeded(place);
     }
     public void addTerm(LocalDate localDate, LocalTime localTime, LocalTime localTime1, Place place, Map<String, String> info) {
-        this.terms.add(new TermImpl(localDate, localTime, localTime1, place, info));
+        this.getTerms().add(new Term(localDate, localTime, localTime1, place, info));
         addPlaceIfNeeded(place);
     }
 
     @Override
     public void deleteTerm(Term term) {
-        Iterator<TermImpl> iterator = this.terms.iterator();
+        Iterator<Term> iterator = this.getTerms().iterator();
         while (iterator.hasNext()) {
-            TermImpl t = iterator.next();
+            Term t = iterator.next();
             if (t.getPlace().equals(term.getPlace()) && t.getDate().equals(term.getDate())
                     && t.getTimeStart().equals(term.getTimeStart()) && t.getTimeEnd().equals(term.getTimeEnd())) {
                 iterator.remove();
@@ -214,43 +164,43 @@ public class ScheduleImpl implements Schedule {
 
     @Override
     public void deleteTermInDateSpan(LocalDate localDate, LocalDate localDate1) {
-        this.terms.removeIf(t -> !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1));
+        this.getTerms().removeIf(t -> !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1));
     }
 
     @Override
     public void deleteTermInDateAndTimeSpan(LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
-        this.terms.removeIf(t -> !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1)
+        this.getTerms().removeIf(t -> !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1)
                                 && !t.getTimeStart().isBefore(localTime) && !t.getTimeStart().isAfter(localTime1));
     }
 
     @Override
     public void deleteTerm(LocalDate localDate, LocalTime localTime, LocalTime localTime1) {
-        this.terms.removeIf(t -> t.getDate().equals(localDate) && !t.getTimeStart().isBefore(localTime)
+        this.getTerms().removeIf(t -> t.getDate().equals(localDate) && !t.getTimeStart().isBefore(localTime)
                                                                 && !t.getTimeStart().isAfter(localTime1));
     }
 
     @Override
     public void deleteTerm(Place place) {
-        this.terms.removeIf(t -> place.getTerms().contains(t));
+        this.getTerms().removeIf(t -> place.getTerms().contains(t));
     }
 
     @Override
     public void deleteTerm(Place place, LocalDate localDate, LocalTime localTime, LocalTime localTime1) {
-        this.deleteTerm(new TermImpl(localDate, localTime, localTime1, place, null));
+        this.deleteTerm(new Term(localDate, localTime, localTime1, place, null));
     }
 
     @Override
     public void deleteTerm(Place place, LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
-        this.terms.removeIf(t -> t.getPlace().equals(place) && !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1)
+        this.getTerms().removeIf(t -> t.getPlace().equals(place) && !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1)
                                                 && !t.getTimeStart().isBefore(localTime) && !t.getTimeStart().isAfter(localTime1));
     }
 
     @Override
     public Term moveTerm(Term term, LocalDate localDate, LocalTime localTime) {
-        TermImpl newTerm = null;
+        Term newTerm = null;
         Duration timeDifference = Duration.between(term.getTimeStart(), localTime);
         LocalTime newTimeEnd = term.getTimeEnd().plus(timeDifference);
-        for(TermImpl t : this.terms){
+        for(Term t : this.getTerms()){
             if(t.equals(term)){
                 newTerm = t;
                 break;
@@ -268,11 +218,11 @@ public class ScheduleImpl implements Schedule {
                 }
             }
             if (available){
-                this.terms.remove(newTerm);
+                this.getTerms().remove(newTerm);
                 newTerm.setDate(localDate);
                 newTerm.setTimeStart(localTime);
                 newTerm.setTimeEnd(newTimeEnd);
-                this.terms.add(newTerm);
+                this.getTerms().add(newTerm);
                 return newTerm;
             }
             else
@@ -285,10 +235,10 @@ public class ScheduleImpl implements Schedule {
 
     @Override
     public Term moveTerm(Term term, LocalDate localDate, LocalTime localTime, Place place) {
-        TermImpl newTerm = null;
+        Term newTerm = null;
         Duration timeDifference = Duration.between(term.getTimeStart(), localTime);
         LocalTime newTimeEnd = term.getTimeEnd().plus(timeDifference);
-        for(TermImpl t : this.terms){
+        for(Term t : this.getTerms()){
             if(t.equals(term)){
                 newTerm = t;
                 break;
@@ -306,11 +256,11 @@ public class ScheduleImpl implements Schedule {
                 }
             }
             if(available){
-                this.terms.remove(newTerm);
+                this.getTerms().remove(newTerm);
                 newTerm.setDate(localDate);
                 newTerm.setTimeStart(localTime);
                 newTerm.setPlace(place);
-                this.terms.add(newTerm);
+                this.getTerms().add(newTerm);
             }
             else
                 System.out.println("Term not available.");
@@ -322,8 +272,8 @@ public class ScheduleImpl implements Schedule {
 
     @Override
     public Term moveTerm(Term term, LocalDate localDate, LocalTime localTime, LocalTime localTime1) {
-        TermImpl newTerm = null;
-        for(TermImpl t : this.terms){
+        Term newTerm = null;
+        for(Term t : this.getTerms()){
             if(t.equals(term)){
                 newTerm = t;
                 break;
@@ -341,11 +291,11 @@ public class ScheduleImpl implements Schedule {
                 }
             }
             if (available){
-                this.terms.remove(newTerm);
+                this.getTerms().remove(newTerm);
                 newTerm.setDate(localDate);
                 newTerm.setTimeStart(localTime);
                 newTerm.setTimeEnd(localTime1);
-                this.terms.add(newTerm);
+                this.getTerms().add(newTerm);
                 return newTerm;
             }
             else
@@ -358,8 +308,8 @@ public class ScheduleImpl implements Schedule {
 
     @Override
     public Term moveTerm(Term term, LocalDate localDate, LocalTime localTime, LocalTime localTime1, Place place) {
-        TermImpl newTerm = null;
-        for(TermImpl t : this.terms){
+        Term newTerm = null;
+        for(Term t : this.getTerms()){
             if(t.equals(term)){
                 newTerm = t;
                 break;
@@ -377,12 +327,12 @@ public class ScheduleImpl implements Schedule {
                 }
             }
             if(available){
-                this.terms.remove(newTerm);
+                this.getTerms().remove(newTerm);
                 newTerm.setDate(localDate);
                 newTerm.setTimeStart(localTime);
                 newTerm.setTimeEnd(localTime1);
                 newTerm.setPlace(place);
-                this.terms.add(newTerm);
+                this.getTerms().add(newTerm);
             }
             else
                 System.out.println("Term not available.");
@@ -394,20 +344,28 @@ public class ScheduleImpl implements Schedule {
 
     @Override
     public List<Term> searchTerm(Place place) {
+        Collections.sort(place.getTerms()); ;
         return place.getTerms();
     }
 
     @Override
+    public List<Term> searchTerm(LocalDate localDate, LocalDate localDate1) {
+        return this.getTerms().stream()
+                .filter(t -> !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1))
+                .sorted().collect(Collectors.toList());
+    }
+
+    @Override
     public List<Term> searchTerm(Place place, LocalDate localDate, LocalDate localDate1) {
-        Stream<Term> filtered = place.getTerms().stream().filter(t -> !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1));
-        return filtered.collect(Collectors.toList());
+        return place.getTerms().stream()
+                .filter(t -> !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1))
+                .sorted().collect(Collectors.toList());
     }
 
     @Override
     public List<Term> searchTerm(Place place, Map<String, String> map) {
-        Stream<Term> filtered = place.getTerms().stream().filter(tmp -> {
+        return place.getTerms().stream().filter(t -> {
             for (Map.Entry<String, String> property : map.entrySet()) {
-                TermImpl t = (TermImpl) tmp;
                 String key = property.getKey();
                 String value = property.getValue();
 
@@ -415,77 +373,187 @@ public class ScheduleImpl implements Schedule {
                     return true;
             }
             return false;
-        });
-        return filtered.collect(Collectors.toList());
+        }).sorted().collect(Collectors.toList());
     }
 
     @Override
     public List<Term> searchTerm(Place place, LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
-        Stream<Term> filtered = place.getTerms().stream().filter(t -> !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1)
-                                                        && !t.getTimeStart().isBefore(localTime) && !t.getTimeStart().isAfter(localTime1));
-        return filtered.collect(Collectors.toList());
+        return place.getTerms().stream()
+                .filter(t -> !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1)
+                        && !t.getTimeStart().isBefore(localTime) && !t.getTimeStart().isAfter(localTime1))
+                .sorted().collect(Collectors.toList());
     }
 
     @Override
     public List<Term> searchTerm(Map<String, Integer> map) {
-        return null;
+        return this.getTerms().stream().filter(t -> {
+            for (Map.Entry<String, Integer> property : map.entrySet()) {
+                String key = property.getKey();
+                Integer value = property.getValue();
+                if(t.getPlace().getProperties().containsKey(key) && (t.getPlace().getProperties().get(key) >= value))
+                    return true;
+            }
+            return false;
+        }).sorted().collect(Collectors.toList());
     }
 
     @Override
     public List<Term> searchTerm(LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
-        Stream<TermImpl> filtered = this.terms.stream().filter(t -> !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1)
-                                                        && !t.getTimeStart().isBefore(localTime) && !t.getTimeStart().isAfter(localTime1));
-        return filtered.collect(Collectors.toList());
+        return this.getTerms().stream()
+                .filter(t -> !t.getDate().isBefore(localDate) && !t.getDate().isAfter(localDate1)
+                        && !t.getTimeStart().isBefore(localTime) && !t.getTimeStart().isAfter(localTime1))
+                .sorted().collect(Collectors.toList());
     }
 
     @Override
-    public String searchAvailableTerms(Date date) {
-        return null;
+    public List<Term> searchAvailableTerms(LocalDate date) {
+        List<Term> availableTerms = new ArrayList<>();
+        for(Place p : this.getPlaces()){
+            Arrays.sort(p.getTerms().toArray());
+            Collections.sort(p.getTerms());
+            LocalTime start = LocalTime.of(0,0);
+            for(Term t : p.getTerms()){
+                if(t.getDate().equals(date)){
+                    availableTerms.add(new Term(date, start, t.getTimeStart(), p, new HashMap<>()));
+                    start = t.getTimeEnd();
+                }
+            }
+            availableTerms.add(new Term(date, start, LocalTime.of(23, 59), p, new HashMap<>()));
+        }
+
+        Collections.sort(availableTerms);
+        return availableTerms;
     }
 
     @Override
-    public List<Place> searchAvailableTerms(Date date, LocalTime localTime, LocalTime localTime1) {
-        return null;
+    public List<Term> searchAvailableTerms(LocalDate localDate, LocalDate localDate1) {
+        List<Term> availableTerms = new ArrayList<>();
+        for(; !localDate.isAfter(localDate1); localDate = localDate.plusDays(1))
+            availableTerms.addAll(searchAvailableTerms(localDate));
+
+        Collections.sort(availableTerms);
+        return availableTerms;
     }
 
     @Override
-    public String searchAvailableTerms(Place place) {
-        return null;
+    public List<Term> searchAvailableTerms(LocalDate date, LocalTime localTime, LocalTime localTime1) {
+        List<Term> availableTerms = new ArrayList<>();
+        for(Place p : this.getPlaces()){
+            Arrays.sort(p.getTerms().toArray());
+            Collections.sort(p.getTerms());
+            LocalTime start = localTime;
+            for(Term t : p.getTerms()){
+                if(t.getDate().equals(date)){
+                    if(!t.getTimeStart().isAfter(localTime))
+                        start = t.getTimeEnd();
+                    if(!t.getTimeEnd().isBefore(localTime1))
+                        availableTerms.add(new Term(date, start, localTime1, p, new HashMap<>()));
+                    else
+                        availableTerms.add(new Term(date, start, t.getTimeEnd(), p, new HashMap<>()));
+                }
+            }
+            availableTerms.add(new Term(date, start, localTime1, p, new HashMap<>()));
+        }
+
+        Collections.sort(availableTerms);
+        return availableTerms;
     }
 
     @Override
-    public String searchAvailableTerms(Place place, LocalDate localDate, LocalDate localDate1) {
-        return null;
+    public List<Term> searchAvailableTerms(Place place) {
+        List<Term> availableTerms = new ArrayList<>();
+        for(LocalDate date = this.getScheduleStartDate(); !date.isAfter(this.getScheduleEndDate()); date = date.plusDays(1)){
+            availableTerms.addAll(searchAvailableTerms(place, date));
+            Collections.sort(availableTerms);
+        }
+
+        Collections.sort(availableTerms);
+        return availableTerms;
     }
 
     @Override
-    public String searchAvailableTerms(Place place, Map<String, Integer> map) {
-        return null;
+    public List<Term> searchAvailableTerms(Place place, LocalDate localDate, LocalDate localDate1) {
+        List<Term> availableTerms = new ArrayList<>();
+        for(; !localDate.isAfter(localDate1); localDate = localDate.plusDays(1)){
+            availableTerms.addAll(searchAvailableTerms(place, localDate));
+        }
+
+        Collections.sort(availableTerms);
+        return availableTerms;
     }
 
     @Override
-    public String searchAvailableTerms(Place place, LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
-        return null;
+    public List<Term> searchAvailableTerms(Place place, Map<String, String> map) {
+        return searchAvailableTerms(place).stream().filter(t -> {
+            for (Map.Entry<String, String> property : map.entrySet()) {
+                String key = property.getKey();
+                String value = property.getValue();
+
+                if (t.getInfo().containsKey(key) && t.getInfo().get(key).contains(value))
+                    return true;
+            }
+            return false;
+        }).sorted().collect(Collectors.toList());
     }
 
     @Override
-    public String searchAvailableTerms(Map<String, Integer> map) {
-        return null;
+    public List<Term> searchAvailableTerms(Place place, LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
+        return searchAvailableTerms(localDate, localDate1, localTime, localTime1).stream()
+                .filter(t -> t.getPlace().equals(place))
+                .sorted().collect(Collectors.toList());
     }
 
     @Override
-    public String searchAvailableTerms(LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
-        return null;
+    public List<Term> searchAvailableTerms(Map<String, Integer> map) {
+        List<Term> availableTerms = new ArrayList<>();
+        for(Place p : this.getPlaces()){
+            for (Map.Entry<String, Integer> property : map.entrySet()){
+                String key = property.getKey();
+                Integer value = property.getValue();
+                if(p.getProperties().containsKey(key) && p.getProperties().get(key) > value)
+                    availableTerms.addAll(searchAvailableTerms(p));
+            }
+        }
+        Collections.sort(availableTerms);
+        return availableTerms;
+    }
+
+    @Override
+    public List<Term> searchAvailableTerms(LocalDate localDate, LocalDate localDate1, LocalTime localTime, LocalTime localTime1) {
+        List<Term> availableTerms = new ArrayList<>();
+        for(; !localDate.isAfter(localDate1); localDate = localDate.plusDays(1)){
+            availableTerms.addAll(searchAvailableTerms(localDate, localTime, localTime1));
+        }
+        Collections.sort(availableTerms);
+        return availableTerms;
+    }
+
+    public List<Term> searchAvailableTerms(Place place, LocalDate localDate) {
+        List<Term> availableTerms = new ArrayList<>();
+        Arrays.sort(place.getTerms().toArray());
+        Collections.sort(place.getTerms());
+
+        LocalTime start = LocalTime.of(0,0);
+        for(Term t : place.getTerms()){
+            if(t.getDate().equals(localDate)){
+                availableTerms.add(new Term(localDate, start, t.getTimeStart(), place, new HashMap<>()));
+                start = t.getTimeEnd();
+            }
+        }
+        availableTerms.add(new Term(localDate, start, LocalTime.of(23, 59), place, new HashMap<>()));
+
+        Collections.sort(availableTerms);
+        return availableTerms;
     }
 
     private void addPlaceIfNeeded(Place place){
         boolean exists = false;
-        for(Place p : this.places){
+        for(Place p : this.getPlaces()){
             if (p.getName().equals(place.getName())){
                 exists = true;
             }
         }
         if(!exists)
-            this.places.add(place);
+            this.getPlaces().add(place);
     }
 }
